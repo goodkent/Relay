@@ -1,6 +1,6 @@
 from __future__ import annotations
 from datetime import datetime
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urlencode
 
 from flask import redirect, render_template, request, url_for, Response
 from flask_login import current_user, login_user, logout_user
@@ -30,6 +30,7 @@ def login():
         domain = email.rsplit("@", 1)[-1] if "@" in email else ""
         provider = get_provider_for_domain(domain) if domain else None
 
+        print(f"DEBUG domain={domain!r}  provider={provider}") 
         if provider is not None and provider.organization.sso_required:
             return _initiate_oidc(provider)
         
@@ -62,6 +63,7 @@ def logout():
     if current_user.is_authenticated:
         org_id = current_user.organization_id
 
+    id_token: str | None = session.pop("id_token", None)
     logout_user()
 
     if org_id:
@@ -78,17 +80,20 @@ def logout():
                 end_session_endpoint = None
             
             if end_session_endpoint:
-                post_logout_uri = url_for("auth.login", _external=True)
+                params: dict[str, str] = {
+                    "post_logout_redirect_uri" : url_for("auth.login", _external=True)
+                }
+                if id_token:
+                    params["id_token_hint"] = id_token
                 return redirect(
-                    f"{end_session_endpoint}"
-                    f"?post_logout_redirect_uri={post_logout_uri}"
+                    f"{end_session_endpoint}?{urlencode(params)}"
                 )
             
     return redirect(url_for("main.index"))
 
 @bp.route("/sso/<slug>")
 def sso_redirect(slug: str):
-    provider = db.session.scalar(db.select(OIDCProvider).join(OIDCProvider.organization).where(db.text("organizations.slug == :slug")).params(slug=slug))
+    provider = db.session.scalar(db.select(OIDCProvider).join(OIDCProvider.organization).where(db.text("organizations.slug = :slug")).params(slug=slug))
     if provider is None:
         abort(404)
     return _initiate_oidc(provider)
@@ -125,7 +130,9 @@ def callback() -> Response:
         except Exception:
             return redirect(url_for("auth.login", error="sso_failed"))
         
-    
+    if id_token := token.get("id_token"):
+        session["id_token"] = id_token
+
     claims = token.get("userinfo") or {}
     if not claims:
         claims = client.userinfo(token=token)

@@ -22,9 +22,10 @@ def provision_user(claims: dict, organization: Organization) -> User:
                     organization_id=organization.id,
                     email=email,
                     display_name=claims.get("name"),
-                    external_id=external_id)
+                    external_id=external_id,
+                    active=True)
         db.session.add(user)
     
     user.last_login_at = datetime.utcnow()
-    db.session.commit
+    db.session.commit()
     return user
