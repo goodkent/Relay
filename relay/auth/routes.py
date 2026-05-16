@@ -30,7 +30,6 @@ def login():
         domain = email.rsplit("@", 1)[-1] if "@" in email else ""
         provider = get_provider_for_domain(domain) if domain else None
 
-        print(f"DEBUG domain={domain!r}  provider={provider}") 
         if provider is not None and provider.organization.sso_required:
             return _initiate_oidc(provider)
         
