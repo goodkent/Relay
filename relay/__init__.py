@@ -7,7 +7,7 @@ from flask import Flask
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from relay.config import Config, DevelopmentConfig, ProductionConfig
-from relay.extensions import db, migrate, csrf, db, login_manager
+from relay.extensions import db, migrate, csrf, db, login_manager, oauth
 
 def create_app(config_class: type[Config] = DevelopmentConfig) -> Flask:
     load_dotenv()
@@ -26,6 +26,7 @@ def create_app(config_class: type[Config] = DevelopmentConfig) -> Flask:
     migrate.init_app(app,db)
     csrf.init_app(app)
     login_manager.init_app(app)
+    oauth.init_app(app)
     login_manager.login_view = "auth.login"
 
     from relay.auth import bp as auth_bp

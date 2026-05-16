@@ -1,5 +1,6 @@
 import logging
 from logging.config import fileConfig
+from relay.security.encryption import EncryptedString
 
 from flask import current_app
 
@@ -14,6 +15,12 @@ config = context.config
 fileConfig(config.config_file_name)
 logger = logging.getLogger('alembic.env')
 
+def render_item(type_, obj, autogen_context) -> str:
+   
+    if type_ == "type" and isinstance(obj, EncryptedString):
+        autogen_context.imports.add("from relay.security.encryption import EncryptedString")
+        return f"EncryptedString(length={obj.length})"
+    return False
 
 def get_engine():
     try:
@@ -65,7 +72,7 @@ def run_migrations_offline():
     """
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
-        url=url, target_metadata=get_metadata(), literal_binds=True
+        url=url, target_metadata=get_metadata(), literal_binds=True, dialect_opts={"paramstyle": "named"}, render_item=render_item, render_as_batch=True,
     )
 
     with context.begin_transaction():
@@ -104,6 +111,12 @@ def run_migrations_online():
         )
 
         with context.begin_transaction():
+            context.configure(
+                connection=connection,
+                target_metadata=get_metadata(),
+                render_item=render_item,
+                render_as_batch=True    
+            )
             context.run_migrations()
 
 
@@ -111,3 +124,4 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
+

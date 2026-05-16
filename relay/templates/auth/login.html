@@ -25,6 +25,9 @@
                         </div>
                         <div class="d-grid">
                             <button type="submit" class="btn btn-primary">Sign in</button>
+                            {% if sso_url %}
+                            <a href="{{ sso_url }}" class="btn btn-outline-primary mt-2">sign in with your organization's SSO</a>
+                            {% endif %}
                         </div>
                     </form>
             </div>
