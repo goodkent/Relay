@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Sign in - Relay{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-5 col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h1 class="card-title h4  mb-4">Sign in to Relay</h1>
+                {% if error %}
+                  <div class="alert alert-danger">{{ error }}</div>
+                {% endif %}
+                {% if sso_url %}
+                    <a href="{{ sso_url }}" class="btn btn-primary w-100 mb-3">Continue with SSO</a>
+                    <div class="text-center text-muted small mb-3">or sign in with password</div>
+                    {% endif %}
+                    <form method="post" action=""{{ url_for('auth.login') }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <div class="mb-3">
+                            <label for=""email" class="form-label">Email address</label>
+                            <input type="email" class="form-control" id="email" name="email" value="{{ email or '' }}" required autofocus>
+                        </div>
+                        <div class="mb-3">
+                            <label for=""password" class="form-label">Password</label>
+                            <input type="password" class="form-control" id="password" name="password">
+                        </div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">Sign in</button>
+                        </div>
+                    </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
