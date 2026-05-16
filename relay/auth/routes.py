@@ -10,7 +10,7 @@ from relay.extensions import db
 from relay.models.user import User
 
 from authlib.jose.errors import JoseError
-from relay.auth.provider import clear_provider_cache, get_oath_client, get_provider_for_domain
+from relay.auth.provider import clear_provider_cache, get_oauth_client, get_provider_for_domain
 from relay.models.organization import OIDCProvider
 
 from flask import session, abort
@@ -54,7 +54,7 @@ def login():
                     next_url = ""
                 return redirect(next_url or url_for("main.index"))
 
-    return render_template("auth/login.html", error=error)
+    return render_template("auth/login.html", error=error, sso_url=sso_url)
 
 @bp.route("/logout")
 def logout():
@@ -70,7 +70,7 @@ def logout():
         )
 
         if provider:
-            client = get_oath_client(provider)
+            client = get_oauth_client(provider)
             try:
                 metadata = client.load_server_metadata()
                 end_session_endpoint = metadata.get("end_session_endpoint")
@@ -88,7 +88,7 @@ def logout():
 
 @bp.route("/sso/<slug>")
 def sso_redirect(slug: str):
-    provider = db.session.scalar(db.select(OIDCProvider).join(OIDCProvider.organization).where(db.text("Organization.slug == :slug")).params(slug=slug))
+    provider = db.session.scalar(db.select(OIDCProvider).join(OIDCProvider.organization).where(db.text("organizations.slug == :slug")).params(slug=slug))
     if provider is None:
         abort(404)
     return _initiate_oidc(provider)
@@ -99,7 +99,7 @@ def _initiate_oidc(provider: OIDCProvider):
     if next_url and urlsplit(next_url).netloc:
         next_url = ""
     session["next_url"] = next_url
-    client = get_oath_client(provider)
+    client = get_oauth_client(provider)
     return client.authorize_redirect(redirect_uri=url_for("auth.callback", _external=True),)
 
 @bp.route("/callback")
@@ -114,14 +114,17 @@ def callback() -> Response:
     if provider is None:
         abort(404)
     
-    client = get_oath_client(provider)
+    client = get_oauth_client(provider)
     try:
         token = client.authorize_access_token()
     except JoseError:
-        clear_provider_cache(provider)
-        client = get_oath_client(provider)
-        token = client.authorize_access_token()
-        return redirect(url_for("auth.login", error="sso_failed"))
+        clear_provider_cache(provider.organization_id)
+        client = get_oauth_client(provider)
+        try:
+            token = client.authorize_access_token()
+        except Exception:
+            return redirect(url_for("auth.login", error="sso_failed"))
+        
     
     claims = token.get("userinfo") or {}
     if not claims:

@@ -9,7 +9,7 @@ _registered: set[str] = set()
 def get_provider_for_domain(domain: str) -> OIDCProvider | None:
     return db.session.scalar(db.select(OIDCProvider).join(OIDCProvider.organization).join(Organization.domains).where(OrgDomain.domain == domain, OrgDomain.verified==True))
 
-def get_oath_client(config: OIDCProvider):
+def get_oauth_client(config: OIDCProvider):
     name = f"org_{config.organization_id}"
 
     if name not in _registered:
