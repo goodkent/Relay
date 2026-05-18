@@ -2,7 +2,7 @@ from __future__ import annotations
 from datetime import datetime
 from urllib.parse import urlsplit, urlencode
 
-from flask import redirect, render_template, request, url_for, Response, flash
+from flask import redirect, render_template, request, url_for, Response, flash, current_app
 from flask_login import current_user, login_user, logout_user, login_required
 
 from relay.auth import bp
@@ -89,6 +89,7 @@ def logout():
         org_id = current_user.organization_id
 
     id_token: str | None = session.pop("id_token", None)
+
     logout_user()
 
     if org_id:
@@ -113,8 +114,27 @@ def logout():
                 return redirect(
                     f"{end_session_endpoint}?{urlencode(params)}"
                 )
-            
-    return redirect(url_for("main.index"))
+
+    if "saml_name_id" in session:
+        org_id = session.get("saml_org_id")
+        provider = db.session.scalar(
+            db.select(SAMLProvider).where(SAMLProvider.organization_id == org_id)
+        )            
+        if provider:
+            settings = _build_saml_settings(provider)
+            auth = OneLogin_Saml2_Auth(prepare_flask_request(), old_settings=settings)
+            slo_url = auth.logout(
+                name_id = session.get("saml_name_id"),
+                session_index=session.get("saml_session_index"),
+                nq = None,
+                name_id_format=session.get("saml_name_id_format")
+            )
+            return redirect(slo_url)
+    
+    
+    session.clear()
+        
+    return redirect(url_for("auth.login"))
 
 @bp.route("/sso/<slug>")
 def sso_redirect(slug: str):
@@ -134,7 +154,7 @@ def _initiate_oidc(provider: OIDCProvider):
 
 @bp.route("/callback")
 def callback() -> Response:
-    print(request.url)
+    
     org_id = session.pop("pending_org_id", None)
     if not org_id:
         return redirect(url_for("auth.login"))
@@ -147,6 +167,7 @@ def callback() -> Response:
     client = get_oauth_client(provider)
     try:
         token = client.authorize_access_token()
+        
     except JoseError:
         clear_provider_cache(provider.organization_id)
         client = get_oauth_client(provider)
@@ -206,16 +227,17 @@ def saml_login(slug:str):
         next_url = ""
     session["next_url"] = next_url
     settings = _build_saml_settings(provider)
-    print(">>> idp section:", settings["idp"]) 
+    
     settings["idp"]["_relay_config"] = provider
     auth = OneLogin_Saml2_Auth(prepare_flask_request(), old_settings=settings)
-    return redirect(auth.login())
+    return redirect(auth.login(return_to=provider.organization_id))
 
 @bp.route("/saml/acs", methods=["POST"])
 @csrf.exempt
 def saml_acs():
-    org_id = session.pop("pending_saml_org_id", None)
+    org_id = request.form.get("RelayState")
     if not org_id:
+        
         return redirect(url_for("auth.login"))
     
     provider = db.session.scalar(
@@ -230,14 +252,16 @@ def saml_acs():
     settings["idp"]["_relay_config"] = provider
     auth = OneLogin_Saml2_Auth(prepare_flask_request(), old_settings=settings)
     auth.process_response()
-
+    
     errors=auth.get_errors()
+
     if errors or not auth.is_authenticated():
         return redirect(url_for("auth.login", error="saml_failed"))
     
     try:
         email, display_name = extract_identity(auth)
     except ValueError:
+        
         return redirect(url_for("auth.login", error="saml_no_email"))
     
     from relay.auth.jit import provision_user_saml
@@ -251,6 +275,11 @@ def saml_acs():
         return redirect(url_for("auth.login", error="account_disabled"))
     
     login_user(user, remember=False)
+    session["saml_name_id"] = auth.get_nameid()
+    session["saml_name_id_format"] = auth.get_nameid_format()
+    session["saml_session_index"] = auth.get_session_index()
+    session["saml_org_id"] = provider.organization_id
+
     next_url = session.pop("next_url", None) or url_for("main.index")
     return redirect(next_url)
 
@@ -318,3 +347,21 @@ def saml_import_metadata(slug:str):
     
     return redirect(url_for("auth.saml_setup",slug=slug)
                     )
+
+@bp.route("/saml/sls")
+def saml_sls():
+
+    org_id = session.get("saml_org_id")
+    if org_id:
+        provider = db.session.scalar(
+              db.select(SAMLProvider).where(SAMLProvider.organization_id == org_id)
+          )
+        if provider:
+            settings = _build_saml_settings(provider)
+            auth = OneLogin_Saml2_Auth(prepare_flask_request(), old_settings=settings)
+            auth.process_slo(keep_local_session=True)
+            if auth.get_errors():
+                current_app.logger.error("SAML SLO errors: %s", auth.get_last_error_reason())
+    logout_user()
+    session.clear()
+    return redirect(url_for("auth.login"))

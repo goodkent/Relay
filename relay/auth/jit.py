@@ -48,12 +48,13 @@ def provision_user_saml(
             id=str(ULID()),
             organization_id = organization.id,
             email=email,
-            display_name = display_name
+            display_name = display_name,
+            active=True
         )
         db.session.add(user)
     elif display_name and not user.display_name:
         user.display_name = display_name
 
     user.last_login_at = datetime.utcnow()
-    db.session.commt()
+    db.session.commit()
     return user

@@ -18,6 +18,7 @@ def _strip_pem(pem: str) -> str:
 def _build_saml_settings(config: SAMLProvider) -> dict:
     return {
         "strict": True,
+        "security": {"allowRepeatAttributeName": True},
         "sp": {
             "entityId": url_for("auth.saml_metadata", _external=True),
             "assertionConsumerService": {
@@ -27,13 +28,18 @@ def _build_saml_settings(config: SAMLProvider) -> dict:
             "NameIDFormat": config.name_id_format,
             "x509cert": _strip_pem(config.sp_certificate or ""),
             "privateKey": _strip_pem(config.sp_private_key or ""),
-
+            "singleLogoutService": {
+                "url": url_for("auth.saml_sls", _external=True)}
             },
         "idp": {
             "entityId": config.idp_entity_id,
             "singleSignOnService": {
                 "url": config.idp_sso_url,
                 "binding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect",
+            },
+            "singleLogoutService": {
+                "url": config.idp_sso_url,
+                "binding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
             },
         "x509cert": config.idp_x509_cert,
         },
