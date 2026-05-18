@@ -30,7 +30,7 @@ def _build_saml_settings(config: SAMLProvider) -> dict:
 
             },
         "idp": {
-            "entityId": config.name_id_format,
+            "entityId": config.idp_entity_id,
             "singleSignOnService": {
                 "url": config.idp_sso_url,
                 "binding": "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect",

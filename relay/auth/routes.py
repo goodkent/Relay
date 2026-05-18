@@ -229,9 +229,9 @@ def saml_acs():
     settings = _build_saml_settings(provider)
     settings["idp"]["_relay_config"] = provider
     auth = OneLogin_Saml2_Auth(prepare_flask_request(), old_settings=settings)
-    auth.process_response
+    auth.process_response()
 
-    errors=auth.get_erros()
+    errors=auth.get_errors()
     if errors or not auth.is_authenticated():
         return redirect(url_for("auth.login", error="saml_failed"))
     
