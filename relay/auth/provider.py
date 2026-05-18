@@ -3,6 +3,7 @@ from __future__ import annotations
 from relay.extensions import db, oauth
 from relay.models.organization import Organization, OIDCProvider, OrgDomain
 from authlib.jose.errors import JoseError
+from relay.models.organization import SAMLProvider
 
 _registered: set[str] = set()
 
@@ -28,4 +29,11 @@ def clear_provider_cache(organization_id: str) -> None:
     oauth._registered.discard(name)
     oauth._clients.pop(name, None)
 
+def get_saml_provider_for_domain(domain:str) -> SAMLProvider | None:
     
+    return db.session.scalar(
+        db.select(SAMLProvider)
+        .join(SAMLProvider.organization)
+        .join(Organization.domains)
+        .where(OrgDomain.domain == domain, OrgDomain.verified ==True) #noqa: E712
+    )

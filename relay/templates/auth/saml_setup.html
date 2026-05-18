@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}SAML Configuration — {{ organization.name }}{% endblock %}
+
+{% block content %}
+<div class="setup-page">
+    <h1>SAML Configuration</h1>
+    <p class="org-context">Organization: <strong>{{ organization.name }}</strong></p>
+
+    {% if request.args.get('saved') %}
+  <div class="alert alert-success">Configuration saved.</div>
+  {% endif %}
+
+  {% if error %}
+  <div class="alert alert-danger">{{ error }}</div>
+  {% endif %}
+
+  <section class="setup-section">
+    <h2>Import from Metadata XML</h2>
+    <p>
+      Download your IdP's federation metadata document and paste it below.
+      Relay extracts the entity ID, SSO URL, and signing certificate automatically.
+    </p>
+    <form method="post"
+          action="{{ url_for('auth.saml_import_metadata', slug=organization.slug) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="field-group">
+        <label for="metadata_xml">Paste IdP Metadata XML</label>
+        <textarea id="metadata_xml" name="metadata_xml" rows="8" class="monospace"
+                  placeholder="&lt;?xml version='1.0' ..."></textarea>
+        <p class="field-hint">
+          Download from your IdP portal and paste the full XML here.
+          Relay will pre-fill the entity ID, SSO URL, and certificate fields.
+        </p>
+      </div>
+      <button type="submit" class="btn btn-secondary">Import metadata</button>
+    </form>
+  </section>
+
+  <hr>
+
+  <section class="setup-section">
+    <h2>Manual Configuration</h2>
+    <p>
+      If your IdP does not publish a metadata document, enter the values from
+      the IdP's application setup screen. All three fields are required.
+    </p>
+    <form method="post"
+          action="{{ url_for('auth.saml_setup', slug=organization.slug) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="field-group">
+        <label for="idp_entity_id">Entity ID</label>
+        <input type="text" id="idp_entity_id" name="idp_entity_id"
+               value="{{ organization.saml_provider.idp_entity_id
+                         if organization.saml_provider else '' }}"
+               placeholder="https://your-idp.example.com/entity-id">
+      </div>
+      <div class="field-group">
+        <label for="idp_sso_url">SSO URL</label>
+        <input type="url" id="idp_sso_url" name="idp_sso_url"
+               value="{{ organization.saml_provider.idp_sso_url
+                         if organization.saml_provider else '' }}"
+               placeholder="https://your-idp.example.com/sso/saml">
+      </div>
+      <div class="field-group">
+        <label for="idp_x509_cert">X.509 Certificate</label>
+        <textarea id="idp_x509_cert" name="idp_x509_cert" rows="6" class="monospace"
+                  placeholder="-----BEGIN CERTIFICATE-----"
+                  >{{ organization.saml_provider.idp_x509_cert
+                       if organization.saml_provider else '' }}</textarea>
+        <p class="field-hint">Paste the full PEM block including the header and footer lines.</p>
+      </div>
+      <button type="submit" class="btn btn-primary">Save configuration</button>
+    </form>
+  </section>
+
+  <section class="setup-section">
+    <h2>Service Provider Details</h2>
+    <p>Give your IdP administrator this URL to register Relay as a SAML service provider:</p>
+    <code>{{ url_for('auth.saml_metadata', _external=True) }}</code>
+  </section>
+</div>
+{% endblock %}

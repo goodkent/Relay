@@ -8,6 +8,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 from relay.config import Config, DevelopmentConfig, ProductionConfig
 from relay.extensions import db, migrate, csrf, db, login_manager, oauth
+from relay.auth.cli import saml_cli
 
 def create_app(config_class: type[Config] = DevelopmentConfig) -> Flask:
     load_dotenv()
@@ -47,5 +48,8 @@ def create_app(config_class: type[Config] = DevelopmentConfig) -> Flask:
         db.session.add(user)
         db.session.commit()
         click.echo(f"Created user: {email}")
+    
+    app.cli.add_command(saml_cli, name="saml")
+    
     return app
 

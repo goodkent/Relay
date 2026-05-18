@@ -29,3 +29,31 @@ def provision_user(claims: dict, organization: Organization) -> User:
     user.last_login_at = datetime.utcnow()
     db.session.commit()
     return user
+
+def provision_user_saml(
+        email: str,
+        display_name: str | None,
+        organization: Organization
+) -> User:
+    
+    user = db.session.scalar(
+        db.select(User).where(
+            User.organization_id == organization.id,
+            User.email == email
+        )
+    )
+
+    if user is None:
+        user = User(
+            id=str(ULID()),
+            organization_id = organization.id
+            email=email
+            display_name = display_name
+        )
+        db.session.add(user)
+    elif display_name and not user.display_name:
+        user.display_name = display_name
+
+    user.last_login_at = datetime.utcnow()
+    db.session.commt()
+    return user

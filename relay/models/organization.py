@@ -7,6 +7,7 @@ import sqlalchemy.orm as so
 
 from relay.extensions import db
 from relay.security.encryption import EncryptedString
+from ulid import ULID
 
 if TYPE_CHECKING:
     from relay.models.user import User
@@ -21,13 +22,16 @@ class Organization(db.Model):
 
     domains: so.Mapped[list[OrgDomain]] = so.relationship(back_populates="organization")
     oidc_provider: so.Mapped[OIDCProvider | None] = so.relationship(back_populates="organization", uselist=False)
-    
+    saml_provider: so.Mapped[SAMLProvider | None] = so.relationship(back_populates="organization", uselist=False)
+
     users: so.Mapped[list[User]] = so.relationship(back_populates="organization")
 
     @property
     def sso_required(self) -> bool:
-        return self.oidc_provider is not None and self.oidc_provider.enforce_sso
-
+        oidc_required = self.oidc_provider is not None and self.oidc_provider.enforce_sso
+        saml_required = self.saml_provider is not None and self.saml_provider.enforce_sso
+        return oidc_required or saml_required
+    
 class OrgDomain(db.Model):
     __tablename__ = "org_domains"
 
@@ -48,3 +52,20 @@ class OIDCProvider(db.Model):
     client_secret: so.Mapped[str] = so.mapped_column(EncryptedString(1024))
     enforce_sso: so.Mapped[bool] = so.mapped_column(default=False)
     organization: so.Mapped[Organization] = so.relationship(back_populates="oidc_provider")
+
+class SAMLProvider(db.Model):
+    __tablename__ = "saml_providers"
+
+    id: so.Mapped[str] = so.mapped_column(sa.String(26), primary_key=True, default=lambda: str(ULID()))
+    organization_id: so.Mapped[str] = so.mapped_column(sa.ForeignKey("organizations.id"), unique=True,index=True)
+    idp_entity_id: so.Mapped[str] = so.mapped_column(sa.String(512))
+    idp_sso_url: so.Mapped[str] = so.mapped_column(sa.String(512))
+    idp_x509_cert: so.Mapped[str] = so.mapped_column(sa.Text)
+    name_id_format: so.Mapped[str] = so.mapped_column(sa.String(255), default="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress")
+    email_attribute: so.Mapped[str | None] = so.mapped_column(sa.String(255))
+    name_attribute: so.Mapped[str | None] = so.mapped_column(sa.String(255))
+    enforce_sso: so.Mapped[bool] = so.mapped_column(default=False)
+    sp_private_key: so.Mapped[str | None] = so.mapped_column(EncryptedString(4096))
+    sp_certificate: so.Mapped[str | None] = so.mapped_column(sa.Text)
+
+    organization: so.Mapped[Organization] = so.relationship(back_populates="saml_provider")
