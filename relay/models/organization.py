@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 import sqlalchemy as sa
 import sqlalchemy.orm as so
+from sqlalchemy.orm import validates
 
 from relay.extensions import db
 from relay.security.encryption import EncryptedString
@@ -31,6 +32,10 @@ class Organization(db.Model):
         oidc_required = self.oidc_provider is not None and self.oidc_provider.enforce_sso
         saml_required = self.saml_provider is not None and self.saml_provider.enforce_sso
         return oidc_required or saml_required
+    
+    @validates("slug")
+    def _normalize_slug(self, key: str, value: str) -> str:
+        return value.lower().strip() if value else value
     
 class OrgDomain(db.Model):
     __tablename__ = "org_domains"
