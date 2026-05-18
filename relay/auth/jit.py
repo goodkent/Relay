@@ -46,8 +46,8 @@ def provision_user_saml(
     if user is None:
         user = User(
             id=str(ULID()),
-            organization_id = organization.id
-            email=email
+            organization_id = organization.id,
+            email=email,
             display_name = display_name
         )
         db.session.add(user)
